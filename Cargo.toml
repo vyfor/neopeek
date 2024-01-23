@@ -1,0 +1,10 @@
+[package]
+name = "neopeek"
+version = "1.0.0"
+authors = ["axeon"]
+edition = "2021"
+description = "CLI tool for obtaining system information in a fancy way"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
