@@ -1,10 +1,20 @@
 [package]
 name = "neopeek"
-version = "1.0.0"
+version = "1.1.0"
 authors = ["axeon"]
 edition = "2021"
 description = "CLI tool for obtaining system information in a fancy way"
 
+[dependencies]
+tokio = {version = "1.35.1", features = ["full"]}
+wmi = "0.13.2"
+serde = "1.0.195"
+term_size = "0.3.2"
+chrono = "0.4.32"
+winreg = "0.52.0"
+
 [profile.release]
 opt-level = 3
+codegen-units = 1
 lto = "fat"
+strip = "symbols"

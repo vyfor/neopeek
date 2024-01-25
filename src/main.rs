@@ -1,54 +1,85 @@
+#![allow(unused_must_use)]
 mod ascii;
-mod enums;
 mod windows;
-use enums::StatType;
-use std::cmp;
-use std::process::Command;
+use chrono::{Local, NaiveDateTime};
+use std::io::Write;
+use std::{cmp, io};
 
-fn main() {
-    display();
+#[tokio::main]
+async fn main() {
+    display().await;
 }
 
-fn display() {
-    let username = std::env::var("COMPUTERNAME")
+async fn display() {
+    let mut handle = io::stdout().lock();
+    let username = &std::env::var("COMPUTERNAME")
         .unwrap_or("null".to_string())
         .to_lowercase();
-    let (info, term) = windows::fetch();
-    let os_name = &format!(
-        "{} {}",
-        info.get(&StatType::Os).unwrap(),
-        std::env::consts::ARCH
+    let info = windows::fetch().await;
+    let os_name = &format!("{} {}", info.0.caption, std::env::consts::ARCH);
+    let uptime = Local::now().naive_local().signed_duration_since(
+        NaiveDateTime::parse_from_str(
+            &info.0.last_boot_up_time[..info.0.last_boot_up_time.len() - 4],
+            "%Y%m%d%H%M%S%.6f",
+        )
+        .unwrap(),
     );
-    let shell = match Command::new("pwsh")
-        .args(&["-C", "$PSVersionTable.PSVersion.ToString()"])
-        .output()
-    {
-        Ok(output) => {
-            format!("PowerShell {}", String::from_utf8_lossy(&output.stdout))
-        }
-        Err(_) => "Not detected".to_string(),
-    };
+    let shell = &windows::fetch_latest_ps_version();
 
     let arr: [(&str, &str); 11] = [
-        ("", &username),
+        ("", username),
         ("", ""), // separator
         ("OS", os_name),
-        ("Kernel", info.get(&StatType::Kernel).unwrap()),
-        ("Shell", &shell),
-        ("Resolution", info.get(&StatType::Resolution).unwrap()),
-        ("Uptime", info.get(&StatType::Uptime).unwrap()),
-        ("CPU", info.get(&StatType::Cpu).unwrap()),
-        ("GPU", info.get(&StatType::Gpu).unwrap()),
-        ("Memory", info.get(&StatType::Ram).unwrap()),
-        ("Disk", info.get(&StatType::Disks).unwrap()),
+        ("Kernel", &info.0.version),
+        ("Shell", shell),
+        (
+            "Resolution",
+            &format!(
+                "{}x{} @ {}Hz",
+                &info.2.current_horizontal_resolution,
+                &info.2.current_vertical_resolution,
+                &info.2.current_refresh_rate
+            ),
+        ),
+        (
+            "Uptime",
+            &format!(
+                "{} hours, {} minutes",
+                uptime.num_hours(),
+                uptime.num_minutes()
+            ),
+        ),
+        ("CPU", &info.1.name),
+        ("GPU", &info.2.name),
+        (
+            "Memory",
+            &format!(
+                "{} MiB / {} MiB",
+                (info.0.total_visible_memory_size
+                    - info.0.free_physical_memory)
+                    / 1024,
+                info.0.total_visible_memory_size / 1024
+            ),
+        ),
+        (
+            "Disk",
+            &info
+                .3
+                .into_iter()
+                .map(|x| {
+                    format!("({}) {} GiB", x.device_id, x.size / 1073741824)
+                })
+                .collect::<Vec<String>>()
+                .join(" | "),
+        ),
     ];
+    let term = term_size::dimensions().unwrap().1 > 37;
     let ascii_len = if term {
         ascii::REM_ASCII.len()
     } else {
         ascii::REM_ASCII_MINI.len()
     };
-    let arr_len = arr.len();
-    let start = (ascii_len - arr_len) / 2
+    let start = (ascii_len - arr.len()) / 2
         - if term { cmp::max(arr.len(), 9) - 9 } else { 0 };
     let max_key_len = arr.iter().map(|v| v.0.len()).max().unwrap_or(0);
     let max_length = arr
@@ -65,24 +96,27 @@ fn display() {
         } else {
             ascii::REM_ASCII_MINI[i]
         };
-        if i >= start && i < start + arr_len {
+        if i >= start && i < start + arr.len() {
             let value = arr.get(i - start).unwrap();
             if i == start {
-                println!(
+                writeln!(
+                    handle,
                     "{}  {}\x1b[1m\x1b[38;2;137;187;234m@{}",
                     line,
                     " ".repeat(padding),
                     &value.1.trim_end()
                 );
             } else if i == start + 1 {
-                println!(
-                    "{}    \x1b[1m\x1b[38;2;137;187;234m{}",
+                writeln!(
+                    handle,
+                    "{}  \x1b[1m\x1b[38;2;137;187;234m{}",
                     line,
                     "—".repeat(max_length)
                 );
             } else {
-                println!(
-                    "{}    \x1b[1m\x1b[38;2;137;187;234m{}\x1b[0m{}{}",
+                writeln!(
+                    handle,
+                    "{}  \x1b[1m\x1b[38;2;137;187;234m{}\x1b[0m{}{}",
                     line,
                     &value.0,
                     " ".repeat(max_key_len - &value.0.len()),
@@ -94,14 +128,15 @@ fn display() {
             }
         } else {
             if i == start + arr.len() + 1 {
-                println!(
+                writeln!(
+                    handle,
                     "{}{}{}",
                     line,
                     " ".repeat(color_padding + 4),
                     ascii::COLORS
                 );
             } else {
-                println!("{}", line);
+                writeln!(handle, "{}", line);
             }
         }
     }
