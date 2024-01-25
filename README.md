@@ -23,3 +23,8 @@ Build from project directory:
 ```sh
 cargo build --release
 ```
+
+Add the executable to your PATH:
+```sh
+setx /M path "%PATH%; (PATH TO .EXE FOLDER)"
+```
