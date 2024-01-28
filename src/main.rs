@@ -46,7 +46,7 @@ async fn display() {
             &format!(
                 "{} hours, {} minutes",
                 uptime.num_hours(),
-                uptime.num_minutes()
+                uptime.num_minutes() % 60
             ),
         ),
         ("CPU", &info.1.name),
