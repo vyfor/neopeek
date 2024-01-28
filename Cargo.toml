@@ -1,6 +1,6 @@
 [package]
 name = "neopeek"
-version = "1.1.0"
+version = "1.1.1"
 authors = ["axeon"]
 edition = "2021"
 description = "CLI tool for obtaining system information in a fancy way"
