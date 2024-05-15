@@ -12,7 +12,7 @@
 ### 🔌 Requirements
 - **Rust**: Get it from the [official website](https://www.rust-lang.org/tools/install)
 
-<br>   
+  
 
 Clone the repository:
 ```sh
